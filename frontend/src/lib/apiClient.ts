@@ -374,8 +374,8 @@ class ApiClient {
 
   // ==================== WEBSOCKET (Real-time updates) ====================
   connectWebSocket(onMessage: (data: any) => void, onError?: (error: any) => void) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host.split(':')[0]}:5000/ws`;
+    const serverUrl = this.baseUrl.replace(/\/api\/?$/, '');
+    const wsUrl = serverUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
     
     const ws = new WebSocket(wsUrl);
 
