@@ -235,8 +235,9 @@ class ApiClient {
     return this.handleResponse(response);
   }
 
-  async getComplaintStats() {
-    const response = await fetch(`${this.baseUrl}/complaints/stats`, {
+  async getComplaintStats(filters?: Record<string, string>) {
+    const queryString = new URLSearchParams(filters || {}).toString();
+    const response = await fetch(`${this.baseUrl}/complaints/stats?${queryString}`, {
       method: 'GET',
       headers: this.getHeaders(),
     });

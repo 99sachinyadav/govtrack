@@ -18,19 +18,27 @@ interface RTIPortalProps {
   projects: Project[];
   rtiStats?: any;
   rtiRequests?: RTIRequest[];
+  complaintStats?: any;
 }
 
-export const RTIPortal: React.FC<RTIPortalProps> = ({ projects, rtiStats, rtiRequests = [] }) => {
+export const RTIPortal: React.FC<RTIPortalProps> = ({ projects, rtiStats, rtiRequests = [], complaintStats }) => {
   const derivedTotal = rtiRequests.length;
   const derivedPending = rtiRequests.filter((r) => r.status === 'pending' || r.status === 'in-review').length;
   const derivedResolved = rtiRequests.filter((r) => r.status === 'approved' || r.status === 'rejected').length;
   const derivedAppeals = rtiRequests.filter((r) => r.status === 'rejected').length;
-
-  const totalRequests = (rtiStats?.totalRequests ?? 0) || derivedTotal;
-  const resolvedRequests = (rtiStats?.resolvedRequests ?? ((rtiStats?.approvedRequests ?? 0) + (rtiStats?.rejectedRequests ?? 0))) || derivedResolved;
-  const pendingRequests = (rtiStats?.pendingRequests ?? 0) || derivedPending;
-  const appealRequests = (rtiStats?.appealRequests ?? rtiStats?.rejectedRequests ?? 0) || derivedAppeals;
-  const projectMap = new Map(projects.map((p) => [p.id, p]));
+  const totalRequests = complaintStats?.totalComplaints ?? rtiStats?.totalRequests ?? derivedTotal;
+  const resolvedRequests =
+    complaintStats?.resolvedComplaints ??
+    rtiStats?.resolvedRequests ??
+    ((rtiStats?.approvedRequests ?? 0) + (rtiStats?.rejectedRequests ?? 0)) ??
+    derivedResolved;
+  const pendingRequests = complaintStats?.pendingComplaints ?? rtiStats?.pendingRequests ?? derivedPending;
+  const appealRequests =
+    complaintStats?.escalatedComplaints ??
+    rtiStats?.appealRequests ??
+    rtiStats?.rejectedRequests ??
+    derivedAppeals;
+  const projectMap = new Map<string, Project>(projects.map((p) => [p.id, p]));
 
   return (
     <div className="space-y-8">

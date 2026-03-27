@@ -109,6 +109,7 @@ export const mapComplaint = (complaint: any): Complaint => ({
   description: complaint.description || '',
   imageUrl: resolveUploadUrl(complaint.imageUrl || complaint.attachments?.[0]),
   status: mapComplaintStatus(complaint.status),
+  priority: complaint.priority || 'medium',
   resolution: complaint.resolution,
   timestamp: safeDate(complaint.timestamp || complaint.createdAt),
   location: complaint.location,

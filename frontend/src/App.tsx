@@ -93,11 +93,15 @@ function AppContent() {
         apiClient.getBudgets(budgetFilters),
       ]);
 
-      setProjects((projectsRes.data || []).map(mapProject));
-      setComplaints((complaintsRes.data || []).map(mapComplaint));
-      setBudgets((budgetsRes.data || []).map(mapBudget));
+      const projectData = Array.isArray(projectsRes.data) ? projectsRes.data : [];
+      const complaintData = Array.isArray(complaintsRes.data) ? complaintsRes.data : [];
+      const budgetData = Array.isArray(budgetsRes.data) ? budgetsRes.data : [];
 
-      const projectIds = (projectsRes.data || []).map((p: any) => p._id || p.id).filter(Boolean);
+      setProjects(projectData.map(mapProject));
+      setComplaints(complaintData.map(mapComplaint));
+      setBudgets(budgetData.map(mapBudget));
+
+      const projectIds = projectData.map((p: any) => p._id || p.id).filter(Boolean);
       const rtiFilters: Record<string, string> = {};
       if (user.role === 'citizen') {
         rtiFilters.requesterId = userIdentifier;
@@ -109,7 +113,7 @@ function AppContent() {
 
       const [projectStatsRes, complaintStatsRes, budgetStatsRes, rtiStatsRes, rtiRequestsRes, contractorsRes] = await Promise.all([
         apiClient.getProjectStats(projectFilters),
-        apiClient.getComplaintStats(),
+        apiClient.getComplaintStats(complaintFilters),
         apiClient.getBudgetStats(budgetFilters),
         apiClient.getRTIStats(rtiStatsFilters),
         apiClient.getRTIRequests(rtiFilters),
@@ -120,7 +124,8 @@ function AppContent() {
       setComplaintStats(complaintStatsRes.data || null);
       setBudgetStats(budgetStatsRes.data || null);
       setRtiStats(rtiStatsRes.data || null);
-      setRtiRequests((rtiRequestsRes.data || []).map(mapRTIRequest));
+      const rtiRequestData = Array.isArray(rtiRequestsRes.data) ? rtiRequestsRes.data : [];
+      setRtiRequests(rtiRequestData.map(mapRTIRequest));
       setContractors(contractorsRes.data || []);
     } catch (err: any) {
       setDataError(err?.message || 'Failed to load data');
@@ -132,6 +137,16 @@ function AppContent() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const intervalId = window.setInterval(() => {
+      loadData();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadData, user]);
 
   // Backend already supplies risk metrics.
 
@@ -240,6 +255,7 @@ function AppContent() {
       const response = await apiClient.createComplaint(payload);
       const created = mapComplaint(response.data);
       setComplaints((prev) => [created, ...prev]);
+      await loadData();
     } catch (err: any) {
       setDataError(err?.message || 'Failed to file complaint');
     }
@@ -251,6 +267,7 @@ function AppContent() {
         ? updates
         : {
             status: updates.status,
+            priority: updates.priority,
             resolution: updates.resolution,
             description: updates.description,
             location: updates.location,
@@ -261,6 +278,7 @@ function AppContent() {
       const response = await apiClient.updateComplaintStatus(id, payload);
       const updated = mapComplaint(response.data);
       setComplaints((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      await loadData();
     } catch (err: any) {
       setDataError(err?.message || 'Failed to update complaint');
     }
@@ -283,7 +301,7 @@ function AppContent() {
 
   const renderContent = () => {
     if (activeTab === 'transparency') {
-      return <RTIPortal projects={projects} rtiStats={rtiStats} rtiRequests={rtiRequests} />;
+      return <RTIPortal projects={projects} rtiStats={rtiStats} rtiRequests={rtiRequests} complaintStats={complaintStats} />;
     }
     if (activeTab === 'community') {
       return <Community projects={projects} />;
@@ -324,7 +342,7 @@ function AppContent() {
             />
         );
       case 'media':
-        return <MediaDashboard projects={projects} rtiStats={rtiStats} />;
+        return <MediaDashboard projects={projects} rtiStats={rtiStats} rtiRequests={rtiRequests} complaints={complaints} onUpdateComplaint={updateComplaint} />;
       case 'contractor':
         return (
           <ContractorDashboard 

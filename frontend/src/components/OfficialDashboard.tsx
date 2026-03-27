@@ -22,7 +22,9 @@ import {
   Calendar,
   Briefcase,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Send,
+  Siren
 } from 'lucide-react';
 import { Project, BudgetAllocation, Complaint } from '../types';
 import { cn } from '../lib/utils';
@@ -65,7 +67,44 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
   const riskAlerts = projectStats?.highRiskProjects ?? projects.filter(p => p.corruptionRisk === 'high').length;
   const resolutionRate = complaintStats?.resolutionRate ? Number(complaintStats.resolutionRate) : null;
   const formatCr = (amount: number) => `₹${(amount / 10000000).toFixed(1)} Cr`;
-
+  const mediaEscalations = complaints
+    .filter((complaint) => complaint.status === 'escalated' && complaint.priority === 'high')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const highPriorityProjectIds = new Set<string>(
+    mediaEscalations
+      .map((complaint) => complaint.projectId)
+      .filter((projectId): projectId is string => Boolean(projectId))
+  );
+  const highPriorityProjects = projects.filter(
+    (project) => project.corruptionRisk === 'high' || highPriorityProjectIds.has(project.id)
+  );
+  const sectorBudgetFallback = projects.reduce((acc, project) => {
+    const key = project.sector || 'General';
+    acc[key] = (acc[key] || 0) + ((project.budget || 0) / 10000000);
+    return acc;
+  }, {} as Record<string, number>);
+  const sectorBudgetData = budgets.length > 0
+    ? budgets.map((budget) => ({
+        name: budget.sector,
+        allocated: Math.round((budget.allocatedAmount || 0) / 10000000),
+      }))
+    : Object.entries(sectorBudgetFallback).map(([name, allocated]) => ({
+        name,
+        allocated: Math.round(Number(allocated)),
+      }));
+  const complaintStatusData = [
+    { name: 'Pending', value: complaints.filter((complaint) => complaint.status === 'pending').length, color: '#F59E0B' },
+    { name: 'In Review', value: complaints.filter((complaint) => complaint.status === 'in-review').length, color: '#1D4ED8' },
+    { name: 'Resolved', value: complaints.filter((complaint) => complaint.status === 'resolved').length, color: '#16A34A' },
+    { name: 'Escalated', value: complaints.filter((complaint) => complaint.status === 'escalated').length, color: '#DC2626' },
+  ].filter((item) => item.value > 0);
+  const projectProgressData = projects
+    .slice(0, 6)
+    .map((project) => ({
+      name: project.title.length > 16 ? `${project.title.slice(0, 16)}…` : project.title,
+      progress: project.progress || 0,
+      spent: Math.round(((project.spent || 0) / Math.max(project.budget || 1, 1)) * 100),
+    }));
   const stats = [
     { label: 'Total Budget', value: formatCr(totalBudget), change: 'Live', trend: 'up' },
     { label: 'Active Projects', value: activeProjects.toString(), change: 'Live', trend: 'up' },
@@ -187,6 +226,95 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
         </div>
       </motion.div>
 
+      {(mediaEscalations.length > 0 || highPriorityProjects.length > 0) && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="gov-card p-6 border border-red-100 bg-red-50/50">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gov-blue">Media Escalation Inbox</h3>
+                  <p className="text-xs text-gov-blue/50">Messages sent by media for urgent official attention.</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-600">
+                {mediaEscalations.length} active
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {mediaEscalations.length === 0 ? (
+                <div className="p-4 rounded-xl bg-white border border-gov-blue/10 text-sm text-gov-blue/60">
+                  No media escalation messages right now.
+                </div>
+              ) : (
+                mediaEscalations.slice(0, 3).map((complaint) => (
+                  <div key={complaint.id} className="p-4 rounded-xl bg-white border border-red-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-50 text-red-600 border border-red-100">
+                        High Priority
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/30">
+                        {new Date(complaint.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-gov-blue">{complaint.projectName || 'General Grievance'}</p>
+                    <p className="text-xs text-gov-blue/60">{complaint.resolution || complaint.description}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/40">
+                      Citizen: {complaint.userName}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="gov-card p-6 border border-gov-saffron/20 bg-gov-saffron/5">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gov-saffron/20 text-gov-saffron flex items-center justify-center">
+                  <Siren className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gov-blue">High Priority Projects</h3>
+                  <p className="text-xs text-gov-blue/50">Projects flagged by AI risk or media escalation workflow.</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gov-saffron">
+                {highPriorityProjects.length} flagged
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {highPriorityProjects.length === 0 ? (
+                <div className="p-4 rounded-xl bg-white border border-gov-blue/10 text-sm text-gov-blue/60">
+                  No high priority projects at the moment.
+                </div>
+              ) : (
+                highPriorityProjects.slice(0, 3).map((project) => (
+                  <div key={project.id} className="p-4 rounded-xl bg-white border border-gov-saffron/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gov-saffron/10 text-gov-saffron border border-gov-saffron/20">
+                        Immediate Review
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/30">
+                        {project.progress}% complete
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-gov-blue">{project.title}</p>
+                    <p className="text-xs text-gov-blue/60">
+                      {project.location.address} • {project.contractorName}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
@@ -210,6 +338,124 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
             <p className="text-3xl font-display font-bold text-gov-blue">{stat.value}</p>
           </motion.div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="gov-card p-6">
+          <div className="mb-5">
+            <h3 className="text-lg font-bold text-gov-blue">Budget Allocation By Sector</h3>
+            <p className="text-xs text-gov-blue/50 mt-1">Approved allocation snapshot in crore.</p>
+          </div>
+          <div className="h-72 flex flex-col justify-end gap-4">
+            {sectorBudgetData.length === 0 ? (
+              <div className="text-sm text-gov-blue/60">No budget allocation data available.</div>
+            ) : (
+              sectorBudgetData.map((item) => {
+                const maxAllocated = Math.max(...sectorBudgetData.map((entry) => entry.allocated), 1);
+                const widthPct = Math.max(10, Math.round((item.allocated / maxAllocated) * 100));
+                return (
+                  <div key={item.name} className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-gov-blue/70">
+                      <span className="capitalize">{item.name}</span>
+                      <span>{item.allocated} Cr</span>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-gov-blue" style={{ width: `${widthPct}%` }} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="gov-card p-6">
+          <div className="mb-5">
+            <h3 className="text-lg font-bold text-gov-blue">Grievance Resolution Mix</h3>
+            <p className="text-xs text-gov-blue/50 mt-1">Citizen complaint status distribution.</p>
+          </div>
+          <div className="h-72 flex flex-col items-center justify-center gap-6">
+            {complaintStatusData.length === 0 ? (
+              <div className="text-sm text-gov-blue/60">No grievance status data available.</div>
+            ) : (
+              <>
+                <div
+                  className="w-44 h-44 rounded-full"
+                  style={{
+                    background: `conic-gradient(${complaintStatusData
+                      .map((item, index, arr) => {
+                        const total = arr.reduce((sum, entry) => sum + entry.value, 0) || 1;
+                        const start = Math.round(
+                          (arr.slice(0, index).reduce((sum, entry) => sum + entry.value, 0) / total) * 360
+                        );
+                        const end = Math.round(
+                          ((arr.slice(0, index + 1).reduce((sum, entry) => sum + entry.value, 0)) / total) * 360
+                        );
+                        return `${item.color} ${start}deg ${end}deg`;
+                      })
+                      .join(', ')})`,
+                  }}
+                >
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-full bg-white border border-slate-200 flex items-center justify-center text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-gov-blue">{complaints.length}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-gov-blue/40">Cases</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            {complaintStatusData.map((item) => (
+              <div key={item.name} className="flex items-center gap-2 text-xs text-gov-blue/70">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                <span>{item.name}: {item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="gov-card p-6">
+          <div className="mb-5">
+            <h3 className="text-lg font-bold text-gov-blue">Project Progress Snapshot</h3>
+            <p className="text-xs text-gov-blue/50 mt-1">Execution vs spend efficiency for active work.</p>
+          </div>
+          <div className="h-72 overflow-y-auto pr-1 space-y-4">
+            {projectProgressData.length === 0 ? (
+              <div className="text-sm text-gov-blue/60">No project progress data available.</div>
+            ) : (
+              projectProgressData.map((project) => (
+                <div key={project.name} className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-gov-blue/70">
+                    <span>{project.name}</span>
+                    <span>{project.progress}% / {project.spent}%</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="w-14 text-[10px] uppercase tracking-widest text-gov-blue/40">Progress</span>
+                      <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-gov-green" style={{ width: `${Math.min(project.progress, 100)}%` }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="w-14 text-[10px] uppercase tracking-widest text-gov-blue/40">Spend</span>
+                      <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-gov-saffron" style={{ width: `${Math.min(project.spent, 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex items-center gap-5 mt-4 text-xs text-gov-blue/70">
+            <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gov-green" /> Progress %</span>
+            <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gov-saffron" /> Spend %</span>
+          </div>
+        </div>
       </div>
 
       {/* Main Content Tabs */}
@@ -268,6 +514,33 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
                   </button>
                 </div>
               </div>
+
+              {highPriorityProjects.length > 0 && (
+                <div className="gov-card p-6 border border-red-100 bg-red-50/40">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gov-blue">Projects Requiring Immediate Action</h3>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-red-600">
+                      Media + AI Priority
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {highPriorityProjects.slice(0, 4).map((project) => (
+                      <div key={project.id} className="p-4 rounded-xl bg-white border border-red-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest bg-red-50 text-red-600 border border-red-100">
+                            High Priority
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/30">
+                            {project.status}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-gov-blue">{project.title}</p>
+                        <p className="text-xs text-gov-blue/60 mt-1">{project.location.address}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4">
                 {filteredProjects.map((project) => (
@@ -475,9 +748,25 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
                         </span>
                         <span className="text-gov-blue/10">|</span>
                         <span className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/40">{complaint.category}</span>
+                        {complaint.priority && (
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border",
+                            complaint.priority === 'high' || complaint.priority === 'critical'
+                              ? "bg-red-50 text-red-600 border-red-100"
+                              : "bg-gov-blue/5 text-gov-blue border-gov-blue/10"
+                          )}>
+                            {complaint.priority} priority
+                          </span>
+                        )}
                       </div>
                       <h4 className="text-lg font-bold text-gov-blue">{complaint.projectName || 'General Grievance'}</h4>
                       <p className="text-gov-blue/70 text-sm leading-relaxed">{complaint.description}</p>
+                      {complaint.resolution && (
+                        <div className="p-4 rounded-xl bg-red-50/60 border border-red-100">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-2">Media Message / Official Note</p>
+                          <p className="text-sm text-gov-blue/70">{complaint.resolution}</p>
+                        </div>
+                      )}
                       {complaint.imageUrl && (
                         <img
                           src={complaint.imageUrl}

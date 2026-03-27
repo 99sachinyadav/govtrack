@@ -13,7 +13,9 @@ import communityRoutes from './routes/communityRoutes.js';
 import { errorHandler } from './middleware/auth.js';
 import { initSocket } from './utils/socket.js';
 import jwt from 'jsonwebtoken';
+import { setServers } from "node:dns/promises";
 
+setServers(["1.1.1.1", "8.8.8.8"]);
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
@@ -44,12 +46,13 @@ io.on('connection', (socket) => {
 connectDB();
 
 // Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+// app.use(cors({
+//   origin: process.env.CORS_ORIGIN?.split(',') || 'http://localhost:5173',
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+// }));
+app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

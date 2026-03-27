@@ -54,6 +54,7 @@ export interface Complaint {
   description: string;
   imageUrl?: string;
   status: 'pending' | 'in-review' | 'resolved' | 'escalated' | 'rejected';
+  priority?: 'low' | 'medium' | 'high' | 'critical';
   resolution?: string;
   timestamp: string;
   location?: string;

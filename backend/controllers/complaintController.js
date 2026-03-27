@@ -205,17 +205,37 @@ export const deleteComplaint = async (req, res) => {
 // Get complaint statistics
 export const getComplaintStats = async (req, res) => {
   try {
-    const totalComplaints = await Complaint.countDocuments();
-    const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
-    const resolvedComplaints = await Complaint.countDocuments({ status: 'resolved' });
-    const criticalComplaints = await Complaint.countDocuments({ priority: 'critical' });
+    const { userId, projectId } = req.query;
+    const baseFilter = {};
+
+    if (userId) baseFilter.userId = userId;
+    if (projectId) baseFilter.projectId = projectId;
+
+    const totalComplaints = await Complaint.countDocuments(baseFilter);
+    const pendingComplaints = await Complaint.countDocuments({
+      ...baseFilter,
+      status: { $in: ['pending', 'in-review'] },
+    });
+    const resolvedComplaints = await Complaint.countDocuments({
+      ...baseFilter,
+      status: 'resolved',
+    });
+    const escalatedComplaints = await Complaint.countDocuments({
+      ...baseFilter,
+      status: 'escalated',
+    });
+    const criticalComplaints = await Complaint.countDocuments({
+      ...baseFilter,
+      priority: 'critical',
+    });
 
     const stats = {
       totalComplaints,
       pendingComplaints,
       resolvedComplaints,
+      escalatedComplaints,
       criticalComplaints,
-      resolutionRate: (resolvedComplaints / totalComplaints * 100).toFixed(2),
+      resolutionRate: totalComplaints > 0 ? (resolvedComplaints / totalComplaints * 100).toFixed(2) : '0.00',
     };
 
     return sendResponse(res, 200, true, 'Stats fetched successfully', stats);
