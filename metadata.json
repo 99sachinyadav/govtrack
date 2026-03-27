@@ -1,0 +1,5 @@
+{
+  "name": "Civic Integrity AI",
+  "description": "A unified digital system for monitoring public resource utilization and enhancing smart governance through transparency and AI-driven oversight.",
+  "requestFramePermissions": ["geolocation"]
+}
