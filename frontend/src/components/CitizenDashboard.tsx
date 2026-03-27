@@ -201,7 +201,7 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* Tax Utilization Section */}
           <div className="gov-card p-8 bg-gradient-to-br from-white to-slate-50">
@@ -241,9 +241,9 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h3 className="text-xl font-bold text-gov-blue">Active Public Projects</h3>
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text" 

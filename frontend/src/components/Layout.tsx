@@ -35,51 +35,73 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, activeTab, setActiveTab 
   ];
 
   return (
-    <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-slate-200 z-50 flex flex-col shadow-sm">
-      <div className="p-6">
-        <div className="flex items-center gap-3 mb-10 group cursor-pointer">
-          <div className="w-10 h-10 rounded-lg bg-gov-blue flex items-center justify-center text-white shadow-md">
-            <ShieldAlert className="w-6 h-6" />
+    <>
+      <div className="hidden lg:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-slate-200 z-50 flex-col shadow-sm">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-10 group cursor-pointer">
+            <div className="w-10 h-10 rounded-lg bg-gov-blue flex items-center justify-center text-white shadow-md">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="block text-sm font-bold text-gov-blue uppercase tracking-wider">Civic Integrity</span>
+              <span className="block text-[10px] font-bold text-gov-saffron uppercase tracking-[0.2em]">Government of India</span>
+            </div>
           </div>
-          <div>
-            <span className="block text-sm font-bold text-gov-blue uppercase tracking-wider">Civic Integrity</span>
-            <span className="block text-[10px] font-bold text-gov-saffron uppercase tracking-[0.2em]">Government of India</span>
-          </div>
+
+          <nav className="space-y-1">
+            {menuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+                  activeTab === item.id 
+                    ? "bg-gov-blue/5 text-gov-blue border-l-4 border-gov-blue" 
+                    : "text-slate-500 hover:text-gov-blue hover:bg-slate-50 border-l-4 border-transparent"
+                )}
+              >
+                <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-gov-blue" : "text-slate-400")} />
+                <span className="text-sm font-semibold">{item.label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <nav className="space-y-1">
+        <div className="mt-auto p-6 border-t border-slate-100">
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-gov-green/10 flex items-center justify-center text-gov-green">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gov-green">Verified Portal</p>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
+              Official platform for public project oversight and accountability.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+        <nav className="grid grid-cols-4 gap-1 px-2 py-2">
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
-                activeTab === item.id 
-                  ? "bg-gov-blue/5 text-gov-blue border-l-4 border-gov-blue" 
-                  : "text-slate-500 hover:text-gov-blue hover:bg-slate-50 border-l-4 border-transparent"
+                "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-all",
+                activeTab === item.id
+                  ? "bg-gov-blue text-white shadow-sm"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-gov-blue"
               )}
             >
-              <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-gov-blue" : "text-slate-400")} />
-              <span className="text-sm font-semibold">{item.label}</span>
+              <item.icon className="w-4 h-4" />
+              <span className="truncate">{item.label}</span>
             </button>
           ))}
         </nav>
       </div>
-
-      <div className="mt-auto p-6 border-t border-slate-100">
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-gov-green/10 flex items-center justify-center text-gov-green">
-              <UserCheck className="w-4 h-4" />
-            </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gov-green">Verified Portal</p>
-          </div>
-          <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
-            Official platform for public project oversight and accountability.
-          </p>
-        </div>
-      </div>
-    </div>
+    </>
   );
 };
 
@@ -92,10 +114,19 @@ export const Navbar: React.FC<NavbarProps> = ({ role }) => {
   const displayName = user?.fullName || 'User';
 
   return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-slate-200 z-40 px-8 shadow-sm">
-      <div className="h-full flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="relative w-80 group">
+    <header className="fixed top-0 left-0 lg:left-64 right-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-sm sm:px-6 lg:h-16 lg:px-8 lg:py-0">
+      <div className="flex min-h-10 flex-col gap-3 lg:h-full lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3 lg:gap-4">
+          <div className="lg:hidden flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gov-blue flex items-center justify-center text-white shadow-md">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-gov-blue">Civic Integrity</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gov-saffron">{role}</p>
+            </div>
+          </div>
+          <div className="relative hidden w-full max-w-xs group sm:block lg:max-w-sm xl:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-gov-blue transition-colors" />
             <input 
               type="text" 
@@ -105,16 +136,16 @@ export const Navbar: React.FC<NavbarProps> = ({ role }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4 lg:gap-6">
           <button className="relative p-2 rounded-lg text-slate-400 hover:text-gov-blue hover:bg-slate-50 transition-all">
             <Bell className="w-5 h-5" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-gov-saffron rounded-full border-2 border-white" />
           </button>
           
-          <div className="h-6 w-[1px] bg-slate-200" />
+          <div className="hidden sm:block h-6 w-[1px] bg-slate-200" />
           
           <div className="flex items-center gap-3 group cursor-pointer">
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="text-sm font-bold text-slate-800">{displayName}</p>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{role}</p>
             </div>

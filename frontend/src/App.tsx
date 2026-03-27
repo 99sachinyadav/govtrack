@@ -401,33 +401,35 @@ function AppContent() {
                 />
                 <div className="flex-1">
                   <Navbar role={role} />
-                  <main className="pl-64 pt-20 min-h-screen">
-                    <div className="p-8 max-w-7xl mx-auto">
+                  <main className="min-h-screen pt-28 pb-24 lg:pl-64 lg:pt-20 lg:pb-0">
+                    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:p-8">
                       {dataError && (
                         <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
                           {dataError}
                         </div>
                       )}
-                      <div className="mb-8 flex items-center justify-between p-6 gov-card bg-white">
-                        <div className="flex items-center gap-4">
+                      <div className="mb-8 gov-card bg-white p-4 sm:p-6">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="flex items-start gap-4">
                           <div className="p-3 rounded-xl bg-gov-blue/5 text-gov-blue">
                             <ShieldAlert className="w-6 h-6" />
                           </div>
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gov-blue/40">Official Secure Session</p>
-                            <p className="text-lg text-gov-blue font-bold">
+                            <p className="text-sm sm:text-lg text-gov-blue font-bold">
                               Welcome back, <span className="text-gov-saffron capitalize">{role}</span>
-                              <span className="ml-2 text-[10px] text-gov-blue/30 font-mono">({userId})</span>
+                              <span className="ml-2 block sm:inline text-[10px] text-gov-blue/30 font-mono">({userId})</span>
                             </p>
                           </div>
+                          </div>
+                          <button 
+                            onClick={handleLogout}
+                            className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all text-xs font-bold uppercase tracking-widest border border-red-100 w-full sm:w-auto"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Terminate Session
+                          </button>
                         </div>
-                        <button 
-                          onClick={handleLogout}
-                          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all text-xs font-bold uppercase tracking-widest border border-red-100"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          Terminate Session
-                        </button>
                       </div>
 
                       <AnimatePresence mode="wait">
@@ -442,9 +444,9 @@ function AppContent() {
                         </motion.div>
                       </AnimatePresence>
 
-                      <footer className="mt-24 pt-12 pb-12 border-t border-gov-blue/10">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                          <div className="flex items-center gap-6">
+                      <footer className="mt-16 sm:mt-24 pt-10 sm:pt-12 pb-6 sm:pb-12 border-t border-gov-blue/10">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+                          <div className="flex items-center gap-4 sm:gap-6">
                             <div className="w-12 h-12 rounded-full bg-gov-blue flex items-center justify-center text-white">
                               <ShieldAlert className="w-6 h-6" />
                             </div>
@@ -453,12 +455,12 @@ function AppContent() {
                               <p className="text-xs text-gov-blue/40">National Smart Governance Initiative • Ministry of Transparency</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-12 text-right">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-12 text-left sm:text-right w-full md:w-auto">
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-widest text-gov-saffron mb-1">Right to Information</p>
                               <p className="text-xs text-gov-blue/60 font-medium">Section 4(1)(b) Compliance Dashboard</p>
                             </div>
-                            <div className="w-px h-10 bg-gov-blue/10" />
+                            <div className="hidden sm:block w-px h-10 bg-gov-blue/10" />
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 rounded-full bg-gov-green animate-pulse" />
                               <span className="text-[10px] font-bold text-gov-green uppercase tracking-widest">System Online</span>

@@ -492,7 +492,7 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
                 <div className="relative w-full md:w-96">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gov-blue/30" />
                   <input 

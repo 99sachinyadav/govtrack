@@ -95,9 +95,9 @@ export const RTIPortal: React.FC<RTIPortalProps> = ({ projects, rtiStats, rtiReq
         </div>
 
         <div className="lg:col-span-3 gov-card p-8 bg-white">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
             <h3 className="text-xl font-display font-bold text-gov-blue">Public Record Database</h3>
-            <div className="relative w-72">
+            <div className="relative w-full lg:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gov-blue/30" />
               <input 
                 type="text" 
