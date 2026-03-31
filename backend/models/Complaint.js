@@ -36,6 +36,34 @@ const complaintSchema = new mongoose.Schema({
   },
   location: String,
   attachments: [String], // File URLs
+  aiAnalysis: {
+    summary: String,
+    officialDescription: String,
+    riskPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    severity: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'critical'],
+    },
+    confidence: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    observations: [String],
+    recommendedActions: [String],
+    status: {
+      type: String,
+      enum: ['pending', 'completed', 'failed', 'skipped'],
+      default: 'pending',
+    },
+    analyzedAt: Date,
+    model: String,
+    error: String,
+  },
   
   // Status Tracking
   status: {

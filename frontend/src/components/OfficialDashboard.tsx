@@ -43,6 +43,14 @@ interface OfficialDashboardProps {
   contractors?: Array<{ id: string; fullName: string; companyName?: string; rating?: number }>;
 }
 
+type ComplaintGroup = {
+  key: string;
+  projectId?: string;
+  projectName: string;
+  complaints: Complaint[];
+  maxRisk: number;
+};
+
 export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({ 
   projects, 
   budgets, 
@@ -105,6 +113,33 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
       progress: project.progress || 0,
       spent: Math.round(((project.spent || 0) / Math.max(project.budget || 1, 1)) * 100),
     }));
+  const grievanceGroupMap: Record<string, ComplaintGroup> = complaints.reduce((acc, complaint) => {
+      const key = complaint.projectId || complaint.projectName || 'general';
+      if (!acc[key]) {
+        acc[key] = {
+          key,
+          projectId: complaint.projectId,
+          projectName: complaint.projectName || 'General Grievance Pool',
+          complaints: [],
+          maxRisk: 0,
+        };
+      }
+
+      acc[key].complaints.push(complaint);
+      acc[key].maxRisk = Math.max(acc[key].maxRisk, complaint.aiAnalysis?.riskPercentage ?? 0);
+      return acc;
+    }, {} as Record<string, ComplaintGroup>);
+  const grievanceGroups: ComplaintGroup[] = Object.values(grievanceGroupMap);
+  grievanceGroups.sort((a, b) => {
+    if (b.maxRisk !== a.maxRisk) return b.maxRisk - a.maxRisk;
+    return b.complaints.length - a.complaints.length;
+  });
+  const riskTone = (risk?: number) => {
+    if ((risk || 0) >= 75) return 'border-red-200 bg-red-50 text-red-700';
+    if ((risk || 0) >= 45) return 'border-amber-200 bg-amber-50 text-amber-700';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  };
+  const riskMeter = (risk?: number) => Math.max(6, Math.min(100, Math.round(risk || 0)));
   const stats = [
     { label: 'Total Budget', value: formatCr(totalBudget), change: 'Live', trend: 'up' },
     { label: 'Active Projects', value: activeProjects.toString(), change: 'Live', trend: 'up' },
@@ -214,7 +249,7 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
           </div>
           <div className="flex items-center gap-6">
             <div className="text-center">
-              <p className="text-2xl font-display font-bold text-gov-saffron">â‚¹4,200 Cr</p>
+              <p className="text-2xl font-display font-bold text-gov-saffron">Rs 1,275 Cr</p>
               <p className="text-[8px] font-bold uppercase tracking-widest text-white/40">Total Oversight</p>
             </div>
             <div className="w-[1px] h-10 bg-white/10" />
@@ -732,76 +767,239 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
               key="complaints"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="space-y-4"
+              className="space-y-6"
             >
-              {complaints.map((complaint) => (
-                <div key={complaint.id} className="gov-card p-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex-1 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border",
-                          complaint.status === 'pending' ? "bg-gov-saffron/10 text-gov-saffron border-gov-saffron/20" : 
-                          complaint.status === 'resolved' ? "bg-gov-green/10 text-gov-green border-gov-green/20" : "bg-red-50 text-red-600 border-red-100"
-                        )}>
-                          {complaint.status}
-                        </span>
-                        <span className="text-gov-blue/10">|</span>
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/40">{complaint.category}</span>
-                        {complaint.priority && (
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border",
-                            complaint.priority === 'high' || complaint.priority === 'critical'
-                              ? "bg-red-50 text-red-600 border-red-100"
-                              : "bg-gov-blue/5 text-gov-blue border-gov-blue/10"
-                          )}>
-                            {complaint.priority} priority
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-lg font-bold text-gov-blue">{complaint.projectName || 'General Grievance'}</h4>
-                      <p className="text-gov-blue/70 text-sm leading-relaxed">{complaint.description}</p>
-                      {complaint.resolution && (
-                        <div className="p-4 rounded-xl bg-red-50/60 border border-red-100">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-2">Media Message / Official Note</p>
-                          <p className="text-sm text-gov-blue/70">{complaint.resolution}</p>
-                        </div>
-                      )}
-                      {complaint.imageUrl && (
-                        <img
-                          src={complaint.imageUrl}
-                          alt="Grievance evidence"
-                          className="gov-image"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="flex items-center gap-4 text-[10px] font-bold text-gov-blue/30 uppercase tracking-wider">
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {complaint.userName}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(complaint.timestamp).toLocaleDateString()}</span>
-                      </div>
+              <div className="gov-card p-6 border border-gov-blue/10 bg-gradient-to-r from-white via-gov-bg to-white">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-gov-blue/40">AI Grievance Command Center</p>
+                    <h3 className="text-2xl font-display font-bold text-gov-blue mt-2">Project-wise grievance intelligence</h3>
+                    <p className="text-sm text-gov-blue/60 mt-2 max-w-3xl">
+                      Each project card now combines citizen evidence, AI-generated official description, and a live risk indicator for faster triage.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 min-w-[280px]">
+                    <div className="rounded-2xl border border-gov-blue/10 bg-white px-4 py-3">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/30">Projects</p>
+                      <p className="text-2xl font-display font-bold text-gov-blue">{grievanceGroups.length}</p>
                     </div>
-                    
-                    <div className="flex flex-col gap-2 justify-center min-w-[180px]">
-                      {complaint.status !== 'resolved' && (
-                        <>
-                          <button 
-                            onClick={() => onUpdateComplaint(complaint.id, { status: 'resolved', resolution: 'Issue addressed by department.' })}
-                            className="w-full py-2.5 rounded-lg bg-gov-green/10 text-gov-green text-[10px] font-bold uppercase tracking-widest hover:bg-gov-green/20 transition-colors"
-                          >
-                            Resolve Grievance
-                          </button>
-                          <button 
-                            onClick={() => onUpdateComplaint(complaint.id, { status: 'escalated' })}
-                            className="w-full py-2.5 rounded-lg bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-colors"
-                          >
-                            Escalate Issue
-                          </button>
-                        </>
-                      )}
+                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-red-500">High Risk</p>
+                      <p className="text-2xl font-display font-bold text-red-600">
+                        {complaints.filter((complaint) => (complaint.aiAnalysis?.riskPercentage ?? 0) >= 75).length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gov-green/20 bg-gov-green/5 px-4 py-3">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-gov-green">AI Reviewed</p>
+                      <p className="text-2xl font-display font-bold text-gov-green">
+                        {complaints.filter((complaint) => complaint.aiAnalysis?.status === 'completed').length}
+                      </p>
                     </div>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {grievanceGroups.map((group) => {
+                const linkedProject = projects.find((project) => project.id === group.projectId);
+
+                return (
+                  <div key={group.key} className="gov-card p-6 md:p-8 border border-gov-blue/10 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.45)]">
+                    <div className="flex flex-col xl:flex-row gap-6">
+                      <div className="xl:w-72 shrink-0 space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-gov-blue/35">Project Cluster</p>
+                            <h4 className="text-2xl font-display font-bold text-gov-blue mt-2">{group.projectName}</h4>
+                          </div>
+                          <span className={cn(
+                            'rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest',
+                            riskTone(group.maxRisk)
+                          )}>
+                            {group.maxRisk}% risk
+                          </span>
+                        </div>
+
+                        <div className="rounded-2xl border border-gov-blue/10 bg-gov-bg p-4 space-y-3">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/35">Linked Project</p>
+                            <p className="text-sm font-semibold text-gov-blue mt-1">
+                              {linkedProject ? linkedProject.location.address : 'Independent citizen grievance'}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-gov-blue/35">
+                              <span>Risk Meter</span>
+                              <span>{group.maxRisk}%</span>
+                            </div>
+                            <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+                              <div
+                                className={cn(
+                                  'h-full rounded-full',
+                                  group.maxRisk >= 75 ? 'bg-red-500' : group.maxRisk >= 45 ? 'bg-amber-500' : 'bg-emerald-500'
+                                )}
+                                style={{ width: `${riskMeter(group.maxRisk)}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-xl bg-white border border-gov-blue/10 p-3">
+                              <p className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/30">Cases</p>
+                              <p className="text-xl font-display font-bold text-gov-blue mt-1">{group.complaints.length}</p>
+                            </div>
+                            <div className="rounded-xl bg-white border border-gov-blue/10 p-3">
+                              <p className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/30">Project Progress</p>
+                              <p className="text-xl font-display font-bold text-gov-blue mt-1">{linkedProject?.progress ?? 0}%</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 space-y-4">
+                        {group.complaints.map((complaint) => (
+                          <div key={complaint.id} className="rounded-[28px] border border-gov-blue/10 bg-white p-5 md:p-6">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              <div className="flex-1 space-y-4">
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                  <span className={cn(
+                                    'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border',
+                                    complaint.status === 'pending' ? 'bg-gov-saffron/10 text-gov-saffron border-gov-saffron/20' :
+                                    complaint.status === 'resolved' ? 'bg-gov-green/10 text-gov-green border-gov-green/20' :
+                                    'bg-red-50 text-red-600 border-red-100'
+                                  )}>
+                                    {complaint.status}
+                                  </span>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/35">{complaint.category}</span>
+                                  {complaint.priority && (
+                                    <span className={cn(
+                                      'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border',
+                                      complaint.priority === 'high' || complaint.priority === 'critical'
+                                        ? 'bg-red-50 text-red-600 border-red-100'
+                                        : 'bg-gov-blue/5 text-gov-blue border-gov-blue/10'
+                                    )}>
+                                      {complaint.priority} priority
+                                    </span>
+                                  )}
+                                  {typeof complaint.aiAnalysis?.confidence === 'number' && (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-gov-blue/10 bg-gov-bg text-gov-blue/60">
+                                      {complaint.aiAnalysis.confidence}% confidence
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] gap-4">
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-gov-blue/35">Citizen Submission</p>
+                                      <p className="text-sm text-gov-blue/75 mt-2 leading-relaxed">{complaint.description}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-gov-blue/10 bg-gov-bg p-4">
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-gov-blue/35">AI Official Description</p>
+                                          <p className="text-sm text-gov-blue mt-2 leading-relaxed">
+                                            {complaint.aiAnalysis?.officialDescription || 'AI analysis unavailable. Manual review required.'}
+                                          </p>
+                                        </div>
+                                        <div className={cn(
+                                          'shrink-0 rounded-2xl border px-4 py-3 text-center min-w-[92px]',
+                                          riskTone(complaint.aiAnalysis?.riskPercentage)
+                                        )}>
+                                          <p className="text-[9px] font-bold uppercase tracking-widest">Risk</p>
+                                          <p className="text-2xl font-display font-bold mt-1">
+                                            {complaint.aiAnalysis?.riskPercentage ?? 0}%
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {complaint.aiAnalysis?.summary && (
+                                        <p className="mt-3 text-xs text-gov-blue/55">{complaint.aiAnalysis.summary}</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {complaint.imageUrl && (
+                                    <div className="rounded-2xl overflow-hidden border border-gov-blue/10 bg-slate-50">
+                                      <img
+                                        src={complaint.imageUrl}
+                                        alt="Grievance evidence"
+                                        className="gov-image h-full min-h-[220px] object-cover"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="rounded-2xl border border-gov-blue/10 bg-white p-4">
+                                    <div className="flex items-center gap-2 mb-3 text-gov-blue">
+                                      <AlertTriangle className="w-4 h-4" />
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.28em]">Key Observations</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {(complaint.aiAnalysis?.observations?.length ? complaint.aiAnalysis.observations : ['Awaiting structured AI observations.']).map((item, index) => (
+                                        <div key={`${complaint.id}-obs-${index}`} className="text-sm text-gov-blue/70 flex gap-2">
+                                          <span className="text-gov-saffron">•</span>
+                                          <span>{item}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-2xl border border-gov-blue/10 bg-white p-4">
+                                    <div className="flex items-center gap-2 mb-3 text-gov-blue">
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.28em]">Recommended Actions</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {(complaint.aiAnalysis?.recommendedActions?.length ? complaint.aiAnalysis.recommendedActions : ['Assign an official reviewer.', 'Verify site conditions and supporting records.']).map((item, index) => (
+                                        <div key={`${complaint.id}-act-${index}`} className="text-sm text-gov-blue/70 flex gap-2">
+                                          <span className="text-gov-green">•</span>
+                                          <span>{item}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {complaint.resolution && (
+                                  <div className="p-4 rounded-2xl bg-red-50/60 border border-red-100">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-2">Media Message / Official Note</p>
+                                    <p className="text-sm text-gov-blue/70">{complaint.resolution}</p>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gov-blue/30 uppercase tracking-wider">
+                                  <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {complaint.userName}</span>
+                                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(complaint.timestamp).toLocaleDateString()}</span>
+                                  {complaint.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {complaint.location}</span>}
+                                  {complaint.aiAnalysis?.model && <span className="flex items-center gap-1"><FileText className="w-3 h-3" /> {complaint.aiAnalysis.model}</span>}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-2 justify-center min-w-[190px]">
+                                {complaint.status !== 'resolved' && (
+                                  <>
+                                    <button
+                                      onClick={() => onUpdateComplaint(complaint.id, { status: 'resolved', resolution: 'Issue addressed by department.' })}
+                                      className="w-full py-3 rounded-xl bg-gov-green/10 text-gov-green text-[10px] font-bold uppercase tracking-widest hover:bg-gov-green/20 transition-colors"
+                                    >
+                                      Resolve Grievance
+                                    </button>
+                                    <button
+                                      onClick={() => onUpdateComplaint(complaint.id, { status: 'escalated' })}
+                                      className="w-full py-3 rounded-xl bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-colors"
+                                    >
+                                      Escalate Issue
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </motion.div>
           )}
 

@@ -58,6 +58,19 @@ export interface Complaint {
   resolution?: string;
   timestamp: string;
   location?: string;
+  aiAnalysis?: {
+    summary?: string;
+    officialDescription?: string;
+    riskPercentage?: number;
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    confidence?: number;
+    observations?: string[];
+    recommendedActions?: string[];
+    status?: 'pending' | 'completed' | 'failed' | 'skipped';
+    analyzedAt?: string;
+    model?: string;
+    error?: string;
+  };
 }
 
 export interface BudgetAllocation {

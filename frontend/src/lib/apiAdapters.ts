@@ -113,6 +113,19 @@ export const mapComplaint = (complaint: any): Complaint => ({
   resolution: complaint.resolution,
   timestamp: safeDate(complaint.timestamp || complaint.createdAt),
   location: complaint.location,
+  aiAnalysis: complaint.aiAnalysis ? {
+    summary: complaint.aiAnalysis.summary,
+    officialDescription: complaint.aiAnalysis.officialDescription,
+    riskPercentage: typeof complaint.aiAnalysis.riskPercentage === 'number' ? complaint.aiAnalysis.riskPercentage : undefined,
+    severity: complaint.aiAnalysis.severity,
+    confidence: typeof complaint.aiAnalysis.confidence === 'number' ? complaint.aiAnalysis.confidence : undefined,
+    observations: Array.isArray(complaint.aiAnalysis.observations) ? complaint.aiAnalysis.observations : [],
+    recommendedActions: Array.isArray(complaint.aiAnalysis.recommendedActions) ? complaint.aiAnalysis.recommendedActions : [],
+    status: complaint.aiAnalysis.status,
+    analyzedAt: complaint.aiAnalysis.analyzedAt ? safeDate(complaint.aiAnalysis.analyzedAt) : undefined,
+    model: complaint.aiAnalysis.model,
+    error: complaint.aiAnalysis.error,
+  } : undefined,
 });
 
 export const mapBudget = (budget: any): BudgetAllocation => ({

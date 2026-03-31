@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole, Project, BudgetAllocation, Complaint, RTIRequest } from './types';
 import { Sidebar, Navbar } from './components/Layout';
@@ -32,7 +32,9 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoaded, setIsLoaded] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   // Global State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -61,12 +63,23 @@ function AppContent() {
       setProjects([]);
       setBudgets([]);
       setComplaints([]);
+      setIsDataLoading(false);
+      setIsRefreshingData(false);
+      setDataError(null);
+      hasLoadedDataRef.current = false;
     }
   }, [user]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!user) return;
-    setIsDataLoading(true);
+    const shouldShowBlockingLoader = !silent || !hasLoadedDataRef.current;
+
+    if (shouldShowBlockingLoader) {
+      setIsDataLoading(true);
+    } else {
+      setIsRefreshingData(true);
+    }
+
     setDataError(null);
     try {
       const userIdentifier = user.identificationId || user.id;
@@ -127,10 +140,12 @@ function AppContent() {
       const rtiRequestData = Array.isArray(rtiRequestsRes.data) ? rtiRequestsRes.data : [];
       setRtiRequests(rtiRequestData.map(mapRTIRequest));
       setContractors(contractorsRes.data || []);
+      hasLoadedDataRef.current = true;
     } catch (err: any) {
       setDataError(err?.message || 'Failed to load data');
     } finally {
       setIsDataLoading(false);
+      setIsRefreshingData(false);
     }
   }, [user]);
 
@@ -142,7 +157,7 @@ function AppContent() {
     if (!user) return;
 
     const intervalId = window.setInterval(() => {
-      loadData();
+      loadData({ silent: true });
     }, 15000);
 
     return () => window.clearInterval(intervalId);
@@ -255,7 +270,7 @@ function AppContent() {
       const response = await apiClient.createComplaint(payload);
       const created = mapComplaint(response.data);
       setComplaints((prev) => [created, ...prev]);
-      await loadData();
+      await loadData({ silent: true });
     } catch (err: any) {
       setDataError(err?.message || 'Failed to file complaint');
     }
@@ -278,7 +293,7 @@ function AppContent() {
       const response = await apiClient.updateComplaintStatus(id, payload);
       const updated = mapComplaint(response.data);
       setComplaints((prev) => prev.map((c) => (c.id === id ? updated : c)));
-      await loadData();
+      await loadData({ silent: true });
     } catch (err: any) {
       setDataError(err?.message || 'Failed to update complaint');
     }
@@ -406,6 +421,12 @@ function AppContent() {
                       {dataError && (
                         <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
                           {dataError}
+                        </div>
+                      )}
+                      {isRefreshingData && (
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gov-blue/10 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-gov-blue/60 backdrop-blur-sm">
+                          <div className="h-2 w-2 rounded-full bg-gov-green animate-pulse" />
+                          Syncing live data
                         </div>
                       )}
                       <div className="mb-8 gov-card bg-white p-4 sm:p-6">

@@ -41,7 +41,7 @@ export const PlatformInfo: React.FC = () => {
 
   const impactStats = [
     { label: 'Projects Under Oversight', value: '12,000+', tone: 'text-gov-blue' },
-    { label: 'Budget Integrity Monitored', value: '₹4,200 Cr', tone: 'text-gov-saffron' },
+    { label: 'Budget Integrity Monitored', value: 'Rs 1,275 Cr', tone: 'text-gov-saffron' },
     { label: 'Citizen Verification Points', value: '45,000+', tone: 'text-gov-green' },
     { label: 'Audit Readiness Score', value: '94%', tone: 'text-gov-blue' },
   ];

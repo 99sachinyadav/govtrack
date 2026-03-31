@@ -26,8 +26,8 @@ interface CitizenDashboardProps {
   projects: Project[];
   budgets: BudgetAllocation[];
   complaints: Complaint[];
-  onAddComplaint: (complaint: Complaint) => Promise<void> | void;
-  onUpdateComplaint: (complaintId: string, updates: Partial<Complaint>) => Promise<void> | void;
+  onAddComplaint: (complaint: Complaint | FormData) => Promise<void> | void;
+  onUpdateComplaint: (complaintId: string, updates: Partial<Complaint> | FormData) => Promise<void> | void;
   projectStats?: any;
   complaintStats?: any;
   budgetStats?: any;
@@ -66,15 +66,15 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
 
   const formatCr = (amount: number) => `₹${(amount / 10000000).toFixed(1)} Cr`;
 
-  const sectorBuckets = budgets.reduce<Record<string, number>>((acc, budget) => {
+  const sectorBuckets: Record<string, number> = budgets.reduce((acc: Record<string, number>, budget) => {
     const key = budget.sector || 'General';
     acc[key] = (acc[key] || 0) + (budget.allocatedAmount || 0);
     return acc;
   }, {});
-  const sectorData = Object.entries(sectorBuckets)
+  const sectorData: Array<{ label: string; amount: number; percent: number }> = Object.entries(sectorBuckets)
     .map(([label, amount]) => ({
       label,
-      amount,
+      amount: Number(amount),
       percent: totalAllocated > 0 ? Math.round((amount / totalAllocated) * 100) : 0,
     }))
     .sort((a, b) => b.amount - a.amount)
@@ -88,6 +88,11 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   const taxColors = ['bg-gov-blue', 'bg-gov-green', 'bg-gov-saffron', 'bg-blue-400', 'bg-slate-400'];
   const highRiskProject = projects.find(p => p.corruptionRisk === 'high');
   const lowRiskProject = projects.find(p => p.corruptionRisk === 'low');
+  const getRiskTone = (risk?: number) => {
+    if ((risk || 0) >= 75) return 'bg-red-100 text-red-700 border-red-200';
+    if ((risk || 0) >= 45) return 'bg-amber-100 text-amber-700 border-amber-200';
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  };
 
   const stats = [
     { label: 'Active Projects', value: activeProjects.toString(), icon: Globe, color: 'text-blue-600' },
@@ -372,22 +377,46 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
           <div className="gov-card p-6">
             <h3 className="text-lg font-bold text-gov-blue mb-6">My Grievances</h3>
             <div className="space-y-4">
-              {complaints.length > 0 ? complaints.map((complaint) => (
-                <div key={complaint.id} className="p-4 rounded-lg bg-slate-50 border border-slate-100 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest",
+                {complaints.length > 0 ? complaints.map((complaint) => (
+                  <div key={complaint.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest",
                       complaint.status === 'pending' ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-gov-green"
                     )}>
                       {complaint.status}
                     </span>
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{new Date(complaint.timestamp).toLocaleDateString()}</span>
-                  </div>
-                  <h5 className="font-bold text-xs text-slate-800">{complaint.projectName || 'General Issue'}</h5>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 italic">"{complaint.description}"</p>
-                  {complaint.imageUrl && (
-                    <img
-                      src={complaint.imageUrl}
+                    </div>
+                    <h5 className="font-bold text-xs text-slate-800">{complaint.projectName || 'General Issue'}</h5>
+                    <p className="text-[11px] text-slate-500 line-clamp-2 italic">"{complaint.description}"</p>
+                    {typeof complaint.aiAnalysis?.riskPercentage === 'number' && (
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">AI Evidence Review</p>
+                            <p className="text-[11px] text-slate-600 mt-1">
+                              {complaint.aiAnalysis.summary || complaint.aiAnalysis.officialDescription}
+                            </p>
+                          </div>
+                          <span className={cn(
+                            'shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest',
+                            getRiskTone(complaint.aiAnalysis.riskPercentage)
+                          )}>
+                            {complaint.aiAnalysis.riskPercentage}% risk
+                          </span>
+                        </div>
+                        {typeof complaint.aiAnalysis.confidence === 'number' && (
+                          <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
+                            <Info className="w-3.5 h-3.5" />
+                            Confidence {complaint.aiAnalysis.confidence}%
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {complaint.imageUrl && (
+                      <img
+                        src={complaint.imageUrl}
                       alt="Grievance evidence"
                       className="gov-image"
                       referrerPolicy="no-referrer"
@@ -488,6 +517,9 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Evidence Image (Optional)</label>
                     <input name="image" type="file" accept="image/*" className="gov-input text-xs" />
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      Image upload hone par AI us photo ko evaluate karega aur official dashboard par automated summary aur risk percentage dikhega.
+                    </p>
                   </div>
 
                   <div className="p-6 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/40 hover:bg-slate-100 transition-all">

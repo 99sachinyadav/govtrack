@@ -2,6 +2,57 @@ import Complaint from '../models/Complaint.js';
 import AuditLog from '../models/AuditLog.js';
 import { sendResponse } from '../utils/helpers.js';
 import { uploadImageBuffer, isCloudinaryConfigured } from '../utils/cloudinary.js';
+import { analyzeComplaintImage } from '../utils/gemini.js';
+
+const buildFallbackAiAnalysis = ({ description, category, error, hasImage }) => ({
+  summary: hasImage
+    ? 'Evidence image received and queued for official review.'
+    : 'No evidence image attached. Manual review required.',
+  officialDescription: description || `Citizen grievance submitted under ${category || 'other'} category.`,
+  riskPercentage: hasImage ? 42 : 28,
+  severity: category === 'safety' ? 'high' : category === 'corruption-suspicion' || category === 'corruption' ? 'high' : 'medium',
+  confidence: hasImage ? 45 : 30,
+  observations: hasImage
+    ? ['Image attached by citizen.', 'Automated review unavailable, manual verification advised.']
+    : ['No visual evidence attached.'],
+  recommendedActions: [
+    'Review the complaint context.',
+    'Assign field verification if the issue impacts public safety or project quality.',
+  ],
+  status: error ? 'failed' : 'skipped',
+  analyzedAt: new Date(),
+  model: 'fallback-manual-review',
+  error,
+});
+
+const resolveAiAnalysis = async ({ imageBuffer, mimeType, description, category, projectName, location }) => {
+  if (!imageBuffer || !mimeType) {
+    return buildFallbackAiAnalysis({
+      description,
+      category,
+      hasImage: false,
+    });
+  }
+
+  try {
+    return await analyzeComplaintImage({
+      imageBuffer,
+      mimeType,
+      description,
+      category,
+      projectName,
+      location,
+    });
+  } catch (error) {
+    console.error('Gemini complaint analysis error:', error);
+    return buildFallbackAiAnalysis({
+      description,
+      category,
+      error: error.message,
+      hasImage: true,
+    });
+  }
+};
 
 // Get all complaints with filters
 export const getComplaints = async (req, res) => {
@@ -57,12 +108,25 @@ export const createComplaint = async (req, res) => {
   try {
     const { userId, userName, projectId, projectName, category, description, location } = req.body;
     let imageUrl = null;
+    let aiAnalysis = buildFallbackAiAnalysis({
+      description,
+      category,
+      hasImage: false,
+    });
     if (req.file?.buffer) {
       if (!isCloudinaryConfigured()) {
         return sendResponse(res, 500, false, 'Cloudinary is not configured. Please set CLOUDINARY_* env vars.');
       }
       const uploadResult = await uploadImageBuffer(req.file.buffer, 'civic/grievances');
       imageUrl = uploadResult.secure_url;
+      aiAnalysis = await resolveAiAnalysis({
+        imageBuffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        description,
+        category,
+        projectName,
+        location,
+      });
     }
 
     if (!userId || !category || !description) {
@@ -78,8 +142,9 @@ export const createComplaint = async (req, res) => {
       description,
       location,
       attachments: imageUrl ? [imageUrl] : [],
+      aiAnalysis,
       status: 'pending',
-      priority: 'medium',
+      priority: aiAnalysis.severity === 'critical' ? 'critical' : aiAnalysis.severity === 'high' ? 'high' : 'medium',
       timestamp: new Date(),
     });
 
@@ -130,6 +195,40 @@ export const updateComplaintStatus = async (req, res) => {
     if (attachments?.length) complaint.attachments = attachments;
     if (imageUrl) complaint.attachments = [imageUrl];
     if (uploadedImageUrl) complaint.attachments = [uploadedImageUrl];
+
+    const nextDescription = description || complaint.description;
+    const nextCategory = category || complaint.category;
+    const nextLocation = location || complaint.location;
+    const nextProjectName = complaint.projectName;
+
+    if (req.file?.buffer) {
+      complaint.aiAnalysis = await resolveAiAnalysis({
+        imageBuffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        description: nextDescription,
+        category: nextCategory,
+        projectName: nextProjectName,
+        location: nextLocation,
+      });
+    } else if (description || category || location) {
+      complaint.aiAnalysis = {
+        ...(complaint.aiAnalysis?.toObject?.() || complaint.aiAnalysis || {}),
+        officialDescription: nextDescription,
+        summary: complaint.aiAnalysis?.summary || 'Complaint details updated. Awaiting evidence review.',
+        recommendedActions: complaint.aiAnalysis?.recommendedActions || [
+          'Review updated citizen notes.',
+          'Confirm whether field inspection is still required.',
+        ],
+      };
+    }
+
+    if (!priority && complaint.aiAnalysis?.severity && ['pending', 'in-review', 'escalated'].includes(status || complaint.status)) {
+      complaint.priority = complaint.aiAnalysis.severity === 'critical'
+        ? 'critical'
+        : complaint.aiAnalysis.severity === 'high'
+          ? 'high'
+          : complaint.priority;
+    }
     
     if (status === 'resolved') {
       complaint.resolvedAt = new Date();
