@@ -5,6 +5,7 @@ import { sendResponse } from '../utils/helpers.js';
 import { uploadImageBuffer, isCloudinaryConfigured } from '../utils/cloudinary.js';
 
 const normalizeStatus = (status) => {
+  // hello
   if (!status || typeof status !== 'string') return status;
   const normalized = status.trim().toLowerCase().replace(/\s+/g, '-');
   switch (normalized) {

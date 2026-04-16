@@ -48,7 +48,6 @@ export const PlatformInfo: React.FC = () => {
 
   const systemLayers = [
     {
-      // hello
       title: 'Sanction Layer',
       desc: 'Project approvals, department ownership, contractor mapping, and baseline budget registration.',
       icon: Landmark,
