@@ -6,6 +6,8 @@ import { uploadImageBuffer, isCloudinaryConfigured } from '../utils/cloudinary.j
 
 const normalizeStatus = (status) => {
   // hello
+  // hii
+  
   if (!status || typeof status !== 'string') return status;
   const normalized = status.trim().toLowerCase().replace(/\s+/g, '-');
   switch (normalized) {
