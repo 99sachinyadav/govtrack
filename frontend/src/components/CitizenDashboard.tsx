@@ -64,6 +64,8 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
       const coords = `[GPS: ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}]`;
       setFormLocation(prev => prev ? `${prev} ${coords}` : coords);
       setFormDescription(prev => prev ? `${prev}\n\n📍 Evidence Geotag: ${coords}` : `📍 Evidence Geotag: ${coords}`);
+    } else {
+      setFormLocation(prev => prev || 'Location unavailable (GPS Failed)');
     }
   };
 

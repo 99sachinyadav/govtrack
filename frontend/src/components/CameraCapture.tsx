@@ -17,35 +17,65 @@ interface CameraCaptureProps {
 export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [fallbackFile, setFallbackFile] = useState<File | null>(null);
 
-  // Initialize camera
-  const startCamera = useCallback(async () => {
+  const [stream, setStream] = useState<MediaStream | null>(null);
+
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+  }, [stream]);
+
+  const initCamera = useCallback(async () => {
     try {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      stopCamera();
+      
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+      } catch (err) {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
-      
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // Prefer back camera on mobile
-      });
-      
+
       setStream(mediaStream);
       setHasPermission(true);
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error accessing camera:', err);
       setHasPermission(false);
     }
+  }, [stopCamera]);
+
+  // Initialize camera
+  useEffect(() => {
+    initCamera();
+    
+    return () => {
+      // Cleanup on unmount. We use a ref approach underneath to ensure it stops.
+      // Since stream is a dependency of stopCamera, it will have the latest stream to stop.
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update streamRef when stream changes so the unmount cleanup works
+  useEffect(() => {
+    streamRef.current = stream;
   }, [stream]);
 
   // Initialize location
@@ -70,25 +100,37 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose
       },
       (error) => {
         console.error('Error getting location:', error);
-        setLocationError('Failed to get precise location. Ensure location services are enabled.');
-        setIsLocating(false);
+        
+        // If high accuracy times out, try once more with low accuracy
+        if (error.code === 3) { // Timeout expired
+          console.warn('High accuracy location timed out, falling back to low accuracy...');
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPosition) => {
+              setLocation({
+                latitude: fallbackPosition.coords.latitude,
+                longitude: fallbackPosition.coords.longitude,
+                accuracy: fallbackPosition.coords.accuracy
+              });
+              setIsLocating(false);
+            },
+            (fallbackErr) => {
+              setLocationError('Failed to get location. Ensure location services are enabled.');
+              setIsLocating(false);
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+        } else {
+          setLocationError('Failed to get precise location. Ensure location services are enabled.');
+          setIsLocating(false);
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   }, []);
 
   useEffect(() => {
-    startCamera();
     getLocation();
-
-    return () => {
-      // Cleanup stream on unmount
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getLocation]);
 
   const handleCapture = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -110,9 +152,15 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose
 
   const handleRetake = () => {
     setCapturedImage(null);
+    setFallbackFile(null);
   };
 
   const handleConfirm = () => {
+    if (fallbackFile) {
+      onCapture(fallbackFile, location);
+      return;
+    }
+
     if (!canvasRef.current) return;
     
     canvasRef.current.toBlob((blob) => {
@@ -156,14 +204,39 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose
       {/* Camera Viewport */}
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
         {hasPermission === false ? (
-          <div className="text-center p-6 space-y-4">
+          <div className="text-center p-6 space-y-6">
             <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center mx-auto">
               <Camera className="w-8 h-8" />
             </div>
-            <p className="text-white font-bold text-lg">Camera Access Denied</p>
-            <p className="text-white/60 text-sm max-w-sm mx-auto">
-              Please enable camera permissions in your browser settings to capture geotagged evidence.
-            </p>
+            <div>
+              <p className="text-white font-bold text-lg">Hardware Locked or Denied</p>
+              <p className="text-white/60 text-sm max-w-sm mx-auto mt-2">
+                Your camera is currently blocked or in use by another application.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6">
+              <button 
+                onClick={() => initCamera()}
+                className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Retry Camera
+              </button>
+              <label className="px-6 py-3 rounded-full bg-gov-blue text-white text-sm font-bold uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:bg-gov-blue/90 transition-colors">
+                Browse Files
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFallbackFile(file);
+                      setCapturedImage(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
         ) : (
           <>
