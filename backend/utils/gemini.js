@@ -27,6 +27,95 @@ const extractText = (response) =>
 
 export const isGeminiConfigured = () => Boolean(process.env.GEMINI_API_KEY);
 
+export const analyzeProjectUpdate = async ({
+  projectTitle,
+  contractorName,
+  status,
+  previousStatus,
+  progress,
+  expenses,
+  budget,
+  resourceUsage,
+  contractorNote,
+  location,
+}) => {
+  if (!isGeminiConfigured()) {
+    return {
+      status: 'skipped',
+      error: 'Gemini API key is not configured.',
+    };
+  }
+
+  const prompt = [
+    'You are an AI assistant helping government officials understand contractor project update submissions.',
+    'Summarize the update into a short official note. Respond strictly as valid JSON with no markdown or extra text.',
+    'Required JSON shape:',
+    '{',
+    '  "summary": "short one-line summary for dashboard card",',
+    '  "officialDescription": "formal explanation of what the contractor reported",',
+    '  "observations": ["max 4 concise operational observations"]',
+    '}',
+    `Project: ${projectTitle || 'Untitled project'}`,
+    `Contractor: ${contractorName || 'Unassigned contractor'}`,
+    `Previous status: ${previousStatus || 'not available'}`,
+    `Current status: ${status || 'not provided'}`,
+    `Progress: ${Number.isFinite(progress) ? `${progress}%` : 'not provided'}`,
+    `Expenses reported: ${Number.isFinite(expenses) ? expenses : 'not provided'}`,
+    `Approved budget: ${Number.isFinite(budget) ? budget : 'not provided'}`,
+    `Resource usage: ${resourceUsage || 'not provided'}`,
+    `Contractor note: ${contractorNote || 'not provided'}`,
+    `Location: ${location || 'not provided'}`,
+    'The response should help an official quickly understand the operational impact of the update.',
+    'Do not invent legal conclusions or compliance outcomes.',
+  ].join('\n');
+
+  const response = await fetch(`${GEMINI_API_URL}?key=${process.env.GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini request failed (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const rawText = extractText(data);
+  if (!rawText) {
+    throw new Error('Gemini returned an empty response.');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch (error) {
+    throw new Error(`Gemini returned invalid JSON: ${rawText}`);
+  }
+
+  return {
+    summary: String(parsed.summary || '').trim(),
+    officialDescription: String(parsed.officialDescription || parsed.summary || '').trim(),
+    observations: normalizeList(parsed.observations),
+    status: 'completed',
+    analyzedAt: new Date(),
+    model: 'gemini-2.0-flash',
+  };
+};
+
 export const analyzeComplaintImage = async ({
   imageBuffer,
   mimeType,

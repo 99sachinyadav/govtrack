@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { Project } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
+import { CameraCapture } from './CameraCapture';
+import { Camera } from 'lucide-react';
 
 interface ContractorDashboardProps {
   projects: Project[];
@@ -32,13 +34,31 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({ projec
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [updateForm, setUpdateForm] = useState<Partial<Project>>({});
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+
+  const handleCameraCapture = (file: File, location: {latitude: number, longitude: number} | null) => {
+    setProofFile(file);
+    setShowCamera(false);
+    
+    if (location) {
+      const coords = `[GPS: ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}]`;
+      setUpdateForm(prev => ({
+        ...prev,
+        contractorNote: prev.contractorNote 
+          ? `${prev.contractorNote}\n\n📍 Evidence Geotag: ${coords}`
+          : `📍 Evidence Geotag: ${coords}`
+      }));
+    }
+  };
 
   const handleOpenUpdate = (project: Project) => {
     setEditingProject(project);
     setUpdateForm({
+      status: project.status,
       progress: project.progress,
       expenses: project.expenses || 0,
       resourceUsage: project.resourceUsage || '',
+      contractorNote: '',
     });
     setProofFile(null);
   };
@@ -47,9 +67,11 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({ projec
     e.preventDefault();
     if (editingProject) {
       const formData = new FormData();
+      if (updateForm.status) formData.set('status', String(updateForm.status));
       formData.set('progress', String(typeof updateForm.progress === 'string' ? Number(updateForm.progress) : updateForm.progress ?? 0));
       formData.set('expenses', String(typeof updateForm.expenses === 'string' ? Number(updateForm.expenses) : updateForm.expenses ?? 0));
       if (updateForm.resourceUsage) formData.set('resourceUsage', updateForm.resourceUsage);
+      if (updateForm.contractorNote) formData.set('contractorNote', updateForm.contractorNote);
       if (proofFile) formData.set('proof', proofFile);
       onUpdateProject(editingProject.id, formData as any);
       setEditingProject(null);
@@ -303,6 +325,21 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({ projec
 
               <form onSubmit={handleSaveUpdate} className="space-y-6">
                 <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/40">Contract Status</label>
+                    <select
+                      value={updateForm.status}
+                      onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value as Project['status'] })}
+                      className="gov-input"
+                    >
+                      <option value="sanctioned">Sanctioned</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="delayed">Delayed</option>
+                      <option value="completed">Completed</option>
+                      <option value="on-hold">On Hold</option>
+                    </select>
+                  </div>
+
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/40">Completion Percentage</label>
@@ -342,20 +379,68 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({ projec
                     />
                   </div>
 
-                  <label className="p-6 rounded-xl border-2 border-dashed border-gov-blue/10 bg-gov-blue/[0.02] flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/30 hover:bg-gov-blue/[0.04] transition-all">
-                    <FileUp className="w-6 h-6 text-gov-blue/20 group-hover:text-gov-blue transition-colors" />
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/40">Upload Work Verification Proof</p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                      className="hidden"
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/40">Contractor Update Note</label>
+                    <textarea
+                      rows={3}
+                      value={updateForm.contractorNote || ''}
+                      onChange={(e) => setUpdateForm({ ...updateForm, contractorNote: e.target.value })}
+                      placeholder="Explain what changed on site, blockers, or what officials should review."
+                      className="gov-input resize-none"
                     />
-                    <span className="text-[10px] text-gov-blue/50">Click to choose image</span>
-                    {proofFile && (
-                      <p className="text-[9px] text-gov-green font-bold uppercase tracking-widest">{proofFile.name}</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/40">Work Verification Proof</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      id="contractor-evidence-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setProofFile(file);
+                      }}
+                    />
+                    
+                    {proofFile ? (
+                      <div className="relative rounded-xl border border-gov-blue/10 overflow-hidden bg-gov-blue/[0.02]">
+                        <img 
+                          src={URL.createObjectURL(proofFile)} 
+                          alt="Evidence" 
+                          className="w-full h-40 object-cover"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => setProofFile(null)}
+                          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="p-2 bg-white text-[10px] text-gov-blue/50 truncate font-mono">
+                          {proofFile.name}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <label 
+                          htmlFor="contractor-evidence-upload"
+                          className="p-6 rounded-xl border-2 border-dashed border-gov-blue/10 bg-gov-blue/[0.02] flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/30 hover:bg-gov-blue/[0.04] transition-all"
+                        >
+                          <FileUp className="w-6 h-6 text-gov-blue/20 group-hover:text-gov-blue transition-colors" />
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/40 text-center">Upload File</p>
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={() => setShowCamera(true)}
+                          className="p-6 rounded-xl border-2 border-dashed border-gov-blue/10 bg-gov-blue/[0.02] flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/30 hover:bg-gov-blue/[0.04] transition-all"
+                        >
+                          <Camera className="w-6 h-6 text-gov-blue/20 group-hover:text-gov-blue transition-colors" />
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gov-blue/40 text-center">Open Camera</p>
+                        </button>
+                      </div>
                     )}
-                  </label>
+                  </div>
                   {editingProject?.proofUrl && (
                     <div className="rounded-xl overflow-hidden border border-gov-blue/10 bg-white">
                       <img
@@ -392,6 +477,14 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({ projec
           </div>
         )}
       </AnimatePresence>
+
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraCapture 
+          onCapture={handleCameraCapture} 
+          onClose={() => setShowCamera(false)} 
+        />
+      )}
     </div>
   );
 };

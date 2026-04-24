@@ -4,6 +4,31 @@
  */
 
 export type UserRole = 'citizen' | 'official' | 'media' | 'contractor';
+export type ProjectLifecycleStatus = 'sanctioned' | 'in-progress' | 'completed' | 'delayed' | 'on-hold';
+
+export interface ProjectStatusUpdate {
+  id: string;
+  updatedById?: string;
+  updatedByName: string;
+  updatedByRole: UserRole | string;
+  previousStatus?: ProjectLifecycleStatus;
+  status: ProjectLifecycleStatus;
+  progress?: number;
+  expenses?: number;
+  resourceUsage?: string;
+  contractorNote?: string;
+  proofUrl?: string;
+  createdAt: string;
+  aiDescription?: {
+    summary?: string;
+    officialDescription?: string;
+    observations?: string[];
+    status?: 'pending' | 'completed' | 'failed' | 'skipped';
+    analyzedAt?: string;
+    model?: string;
+    error?: string;
+  };
+}
 
 export interface Project {
   id: string;
@@ -12,7 +37,7 @@ export interface Project {
   sector: 'infrastructure' | 'welfare' | 'procurement' | 'delivery' | 'healthcare' | 'education' | 'agriculture' | 'energy' | 'sanitation';
   budget: number;
   spent: number;
-  status: 'sanctioned' | 'in-progress' | 'completed' | 'delayed' | 'on-hold';
+  status: ProjectLifecycleStatus;
   contractorId: string;
   contractorName: string;
   department: string;
@@ -31,6 +56,7 @@ export interface Project {
   resourceUsage?: string;
   expenses?: number;
   proofUrl?: string;
+  statusUpdates?: ProjectStatusUpdate[];
 }
 
 export interface Feedback {

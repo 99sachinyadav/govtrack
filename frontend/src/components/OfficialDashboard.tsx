@@ -24,7 +24,9 @@ import {
   X,
   ShieldCheck,
   Send,
-  Siren
+  Siren,
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import { Project, BudgetAllocation, Complaint } from '../types';
 import { cn } from '../lib/utils';
@@ -149,8 +151,21 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
 
   const filteredProjects = projects.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.contractorName.toLowerCase().includes(searchQuery.toLowerCase())
+    p.contractorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.contractorId.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const recentContractorUpdates = filteredProjects
+    .flatMap((project) =>
+      (project.statusUpdates || [])
+        .map((update) => ({
+          projectId: project.id,
+          projectTitle: project.title,
+          contractorName: project.contractorName,
+          update,
+        }))
+    )
+    .sort((a, b) => new Date(b.update.createdAt).getTime() - new Date(a.update.createdAt).getTime())
+    .slice(0, 6);
 
   const handleSanctionSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -577,8 +592,82 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
                 </div>
               )}
 
+              <div className="gov-card p-6 border border-gov-blue/10 bg-white">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold text-gov-blue">Recent Project Updates</h3>
+                    <p className="text-xs text-gov-blue/50">Uploads and status submissions now appear here with an AI description for official review.</p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gov-saffron">
+                    {recentContractorUpdates.length} recent updates
+                  </span>
+                </div>
+
+                {recentContractorUpdates.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gov-blue/15 bg-gov-blue/[0.02] p-5 text-sm text-gov-blue/55">
+                    No updates yet. When a contractor uploads proof or changes contract progress, the update will appear here automatically.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    {recentContractorUpdates.map(({ projectTitle, contractorName, update }) => (
+                      <div key={update.id} className="rounded-2xl border border-gov-blue/10 bg-gov-bg p-5 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gov-saffron">
+                              <Upload className="w-3.5 h-3.5" />
+                              Project update
+                            </div>
+                            <p className="text-sm font-bold text-gov-blue">{projectTitle}</p>
+                            <p className="text-xs text-gov-blue/50">{contractorName}</p>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/30">
+                            {new Date(update.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100">
+                            {update.status}
+                          </span>
+                          {typeof update.progress === 'number' && (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gov-blue/5 text-gov-blue border border-gov-blue/10">
+                              {update.progress}% progress
+                            </span>
+                          )}
+                          {update.proofUrl && (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gov-green/10 text-gov-green border border-gov-green/20">
+                              Proof uploaded
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="rounded-2xl border border-gov-saffron/20 bg-gov-saffron/5 p-4">
+                          <div className="flex items-center gap-2 mb-2 text-gov-blue">
+                            <Sparkles className="w-4 h-4 text-gov-saffron" />
+                            <p className="text-[10px] font-bold uppercase tracking-[0.24em]">AI Description</p>
+                          </div>
+                          <p className="text-sm text-gov-blue/75">
+                            {update.aiDescription?.officialDescription || update.aiDescription?.summary || 'AI description is being prepared for this update.'}
+                          </p>
+                        </div>
+
+                        {update.contractorNote && (
+                          <div className="rounded-2xl border border-gov-blue/10 bg-white p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/35 mb-2">Contractor Note</p>
+                            <p className="text-sm text-gov-blue/70">{update.contractorNote}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 gap-4">
-                {filteredProjects.map((project) => (
+                {filteredProjects.map((project) => {
+                  const contractorUpdates = (project.statusUpdates || []);
+
+                  return (
                   <div key={project.id} className="gov-card p-6 hover:shadow-md transition-shadow">
                     <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center">
                       <div className="flex-1 space-y-3">
@@ -615,6 +704,77 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
                             Deadline: {new Date(project.endDate).toLocaleDateString()}
                           </div>
                         </div>
+                        {contractorUpdates.length > 0 && (
+                          <div className="space-y-3 mt-4 max-h-64 overflow-y-auto pr-2">
+                            {contractorUpdates.map((update, idx) => (
+                              <div key={(update as any).id || (update as any)._id || idx} className="rounded-2xl border border-gov-saffron/20 bg-gov-saffron/5 p-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 text-gov-blue">
+                                    <Sparkles className="w-4 h-4 text-gov-saffron" />
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.24em]">Project Update</p>
+                                  </div>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/30">
+                                    {new Date(update.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gov-blue/75">
+                                  {update.aiDescription?.officialDescription ||
+                                    update.aiDescription?.summary ||
+                                    'Update received and ready for official review.'}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-blue-600 border border-blue-100">
+                                    {update.status}
+                                  </span>
+                                  {typeof update.progress === 'number' && (
+                                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-gov-blue border border-gov-blue/10">
+                                      {update.progress}% progress
+                                    </span>
+                                  )}
+                                  {update.proofUrl && (
+                                    <a 
+                                      href={update.proofUrl} 
+                                      target="_blank" 
+                                      rel="noreferrer"
+                                      className="group block w-full sm:w-3/4 lg:w-full xl:w-4/5 mt-4 relative rounded-2xl overflow-hidden border border-gov-blue/10 bg-slate-100 shadow-sm hover:shadow-md transition-all"
+                                    >
+                                      <div className="aspect-[16/9] w-full overflow-hidden bg-slate-200">
+                                        <img
+                                          src={update.proofUrl}
+                                          alt="Work Verification Proof"
+                                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                      </div>
+                                      <div className="absolute inset-0 bg-gradient-to-t from-gov-blue/90 via-gov-blue/10 to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-300" />
+                                      <div className="absolute bottom-0 inset-x-0 p-4 translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                                              <FileText className="w-3.5 h-3.5 text-white" />
+                                            </div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-white drop-shadow-sm">
+                                              View Evidence
+                                            </p>
+                                          </div>
+                                          <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                                            <ArrowUpRight className="w-3.5 h-3.5 text-white" />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </a>
+                                  )}
+                                </div>
+                                {update.contractorNote && (
+                                  <div className="mt-2 bg-white rounded-xl p-3 border border-gov-blue/5">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gov-blue/30 mb-1">Contractor Note</p>
+                                    <p className="text-xs text-gov-blue/70">{update.contractorNote}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="w-full lg:w-56 space-y-3">
@@ -677,7 +837,8 @@ export const OfficialDashboard: React.FC<OfficialDashboardProps> = ({
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </motion.div>
           )}

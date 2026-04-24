@@ -20,6 +20,7 @@ import { cn } from './lib/utils';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import apiClient from './lib/apiClient';
 import { mapBudget, mapComplaint, mapComplaintCategoryToApi, mapProject, mapRTIRequest } from './lib/apiAdapters';
+import { connectSocket } from './lib/socket';
 
 type ViewState = 'landing' | 'login' | 'dashboard';
 
@@ -88,7 +89,6 @@ function AppContent() {
       const budgetFilters: Record<string, string> = {};
 
       if (user.role === 'official') {
-        projectFilters.officialId = userIdentifier;
         budgetFilters.officialId = userIdentifier;
       }
 
@@ -163,6 +163,21 @@ function AppContent() {
     return () => window.clearInterval(intervalId);
   }, [loadData, user]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const socket = connectSocket();
+    const handleProjectStatusUpdated = () => {
+      loadData({ silent: true });
+    };
+
+    socket.on('project:statusUpdated', handleProjectStatusUpdated);
+
+    return () => {
+      socket.off('project:statusUpdated', handleProjectStatusUpdated);
+    };
+  }, [loadData, user]);
+
   // Backend already supplies risk metrics.
 
   const handleLogout = () => {
@@ -200,7 +215,7 @@ function AppContent() {
   const updateProject = async (id: string, updates: Partial<Project> | FormData) => {
     if (!user) return;
     try {
-      const statusFields = ['status', 'progress', 'expenses', 'resourceUsage'];
+      const statusFields = ['status', 'progress', 'expenses', 'resourceUsage', 'contractorNote', 'proof'];
       const updateKeys = updates instanceof FormData ? Array.from(updates.keys()) : Object.keys(updates);
       const hasOnlyStatusFields = updateKeys.every((key) => statusFields.includes(key));
       const isStatusUpdate =
@@ -209,6 +224,7 @@ function AppContent() {
           typeof (updates as any).progress === 'number' ||
           typeof (updates as any).expenses === 'number' ||
           typeof (updates as any).resourceUsage === 'string' ||
+          typeof (updates as any).contractorNote === 'string' ||
           typeof (updates as any).status === 'string');
 
       const response = isStatusUpdate
@@ -221,6 +237,7 @@ function AppContent() {
                   progress: updates.progress,
                   expenses: updates.expenses,
                   resourceUsage: updates.resourceUsage,
+                  contractorNote: (updates as any).contractorNote,
                 }
           )
         : await apiClient.updateProject(id, {

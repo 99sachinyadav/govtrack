@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { Project, BudgetAllocation, Complaint } from '../types';
 import { cn } from '../lib/utils';
+import { CameraCapture } from './CameraCapture';
+import { FileUp, X } from 'lucide-react';
 
 interface CitizenDashboardProps {
   userId: string | null;
@@ -47,6 +49,23 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Camera & Geotagging State
+  const [showCamera, setShowCamera] = useState(false);
+  const [capturedFile, setCapturedFile] = useState<File | null>(null);
+  const [formLocation, setFormLocation] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+
+  const handleCameraCapture = (file: File, location: {latitude: number, longitude: number} | null) => {
+    setCapturedFile(file);
+    setShowCamera(false);
+    
+    if (location) {
+      const coords = `[GPS: ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}]`;
+      setFormLocation(prev => prev ? `${prev} ${coords}` : coords);
+      setFormDescription(prev => prev ? `${prev}\n\n📍 Evidence Geotag: ${coords}` : `📍 Evidence Geotag: ${coords}`);
+    }
+  };
 
   const totalProjects = projectStats?.totalProjects ?? projects.length;
   const activeProjects = projectStats?.activeProjects ?? projects.length;
@@ -108,13 +127,21 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
     if (project?.title) {
       formData.set('projectName', project.title);
     }
-    const imageFile = formData.get('image') as File;
-    if (!imageFile || imageFile.size === 0) {
-      formData.delete('image');
+    // Override the image if capturedFile is set
+    if (capturedFile) {
+      formData.set('image', capturedFile);
+    } else {
+      const imageFile = formData.get('image') as File;
+      if (!imageFile || imageFile.size === 0) {
+        formData.delete('image');
+      }
     }
 
     await onAddComplaint(formData);
     setShowReportModal(false);
+    setCapturedFile(null);
+    setFormLocation('');
+    setFormDescription('');
   };
 
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -143,7 +170,12 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
         
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setShowReportModal(true)}
+            onClick={() => {
+              setCapturedFile(null);
+              setFormLocation('');
+              setFormDescription('');
+              setShowReportModal(true);
+            }}
             className="gov-button-primary flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
@@ -283,16 +315,99 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                     </div>
                     <h4 className="text-lg font-bold text-slate-800">{project.title}</h4>
                     <p className="text-slate-500 text-sm leading-relaxed line-clamp-2">{project.description}</p>
-                    {project.proofUrl && (
-                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 bg-white">
-                        <img
-                          src={project.proofUrl}
-                          alt="Work verification proof"
-                          className="gov-image-inset"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                          Work Verification Proof
+                    {(!project.statusUpdates || project.statusUpdates.length === 0) && project.proofUrl && (
+                      <a 
+                        href={project.proofUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="group block w-full sm:w-3/4 lg:w-2/3 mt-4 relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all"
+                      >
+                        <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
+                          <img
+                            src={project.proofUrl}
+                            alt="Work Verification Proof"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+                        <div className="absolute bottom-0 inset-x-0 p-4 translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                                <Camera className="w-3.5 h-3.5 text-white" />
+                              </div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-white drop-shadow-sm">
+                                View Evidence
+                              </p>
+                            </div>
+                            <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                              <ArrowUpRight className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          </div>
+                        </div>
+                      </a>
+                    )}
+                    
+                    {project.statusUpdates && project.statusUpdates.length > 0 && (
+                      <div className="mt-5 space-y-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" /> Project Timeline & Evidence
+                        </p>
+                        <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                          {project.statusUpdates.map((update: any, idx: number) => (
+                            <div key={update.id || update._id || idx} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                  {new Date(update.createdAt).toLocaleDateString()}
+                                </span>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest bg-white border border-slate-200",
+                                  update.status === 'delayed' ? "text-red-600" : "text-gov-blue"
+                                )}>
+                                  {update.status || 'Update'}
+                                </span>
+                              </div>
+                              
+                              <p className="text-sm text-slate-600 leading-relaxed">
+                                {update.aiDescription?.summary || update.contractorNote || 'Project progress updated.'}
+                              </p>
+                              
+                              {update.proofUrl && (
+                                <a 
+                                  href={update.proofUrl} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="group block w-full sm:w-3/4 lg:w-2/3 mt-3 relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all"
+                                >
+                                  <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
+                                    <img
+                                      src={update.proofUrl}
+                                      alt="Work Verification Proof"
+                                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </div>
+                                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+                                  <div className="absolute bottom-0 inset-x-0 p-3 translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                                          <Camera className="w-3.5 h-3.5 text-white" />
+                                        </div>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-white drop-shadow-sm">
+                                          View Photo Evidence
+                                        </p>
+                                      </div>
+                                      <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                                        <ArrowUpRight className="w-3.5 h-3.5 text-white" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </a>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -499,7 +614,14 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Location</label>
-                      <input name="location" required className="gov-input text-xs" placeholder="e.g. Ward 12, Main St" />
+                      <input 
+                        name="location" 
+                        required 
+                        value={formLocation}
+                        onChange={(e) => setFormLocation(e.target.value)}
+                        className="gov-input text-xs" 
+                        placeholder="e.g. Ward 12, Main St" 
+                      />
                     </div>
                   </div>
 
@@ -509,22 +631,64 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
                       name="description" 
                       required 
                       rows={4}
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
                       className="gov-input text-xs resize-none" 
                       placeholder="Please provide specific details about the issue..."
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Upload Evidence Image (Optional)</label>
-                    <input name="image" type="file" accept="image/*" className="gov-input text-xs" />
-                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                      Image upload hone par AI us photo ko evaluate karega aur official dashboard par automated summary aur risk percentage dikhega.
-                    </p>
-                  </div>
-
-                  <div className="p-6 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/40 hover:bg-slate-100 transition-all">
-                    <Camera className="w-6 h-6 text-slate-300 group-hover:text-gov-blue transition-colors" />
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Upload Evidence (Photos/Docs)</p>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Evidence Image (Optional)</label>
+                    <input 
+                      name="image" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      id="evidence-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setCapturedFile(file);
+                      }}
+                    />
+                    
+                    {capturedFile ? (
+                      <div className="relative rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                        <img 
+                          src={URL.createObjectURL(capturedFile)} 
+                          alt="Evidence" 
+                          className="w-full h-40 object-cover"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => setCapturedFile(null)}
+                          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="p-2 bg-white text-[10px] text-slate-500 truncate font-mono">
+                          {capturedFile.name}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <label 
+                          htmlFor="evidence-upload"
+                          className="p-6 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/40 hover:bg-slate-100 transition-all"
+                        >
+                          <FileUp className="w-6 h-6 text-slate-300 group-hover:text-gov-blue transition-colors" />
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Upload File</p>
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={() => setShowCamera(true)}
+                          className="p-6 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-3 group cursor-pointer hover:border-gov-blue/40 hover:bg-slate-100 transition-all"
+                        >
+                          <Camera className="w-6 h-6 text-slate-300 group-hover:text-gov-blue transition-colors" />
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Open Camera</p>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -654,6 +818,13 @@ export const CitizenDashboard: React.FC<CitizenDashboardProps> = ({
           </div>
         )}
       </AnimatePresence>
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraCapture 
+          onCapture={handleCameraCapture} 
+          onClose={() => setShowCamera(false)} 
+        />
+      )}
     </div>
   );
 };

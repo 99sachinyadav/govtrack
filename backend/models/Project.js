@@ -1,5 +1,49 @@
 import mongoose from 'mongoose';
 
+const projectStatusUpdateSchema = new mongoose.Schema({
+  updatedById: String,
+  updatedByName: String,
+  updatedByRole: {
+    type: String,
+    enum: ['official', 'contractor', 'system', 'citizen', 'media'],
+    default: 'system',
+  },
+  previousStatus: String,
+  status: {
+    type: String,
+    enum: ['sanctioned', 'in-progress', 'completed', 'delayed', 'on-hold'],
+  },
+  progress: {
+    type: Number,
+    min: 0,
+    max: 100,
+  },
+  expenses: {
+    type: Number,
+    min: 0,
+  },
+  resourceUsage: String,
+  contractorNote: String,
+  proofUrl: String,
+  aiDescription: {
+    summary: String,
+    officialDescription: String,
+    observations: [String],
+    status: {
+      type: String,
+      enum: ['pending', 'completed', 'failed', 'skipped'],
+      default: 'skipped',
+    },
+    analyzedAt: Date,
+    model: String,
+    error: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+}, { _id: true });
+
 const projectSchema = new mongoose.Schema({
   // Basic Information
   title: {
@@ -120,6 +164,7 @@ const projectSchema = new mongoose.Schema({
     default: 0,
   },
   proofUrl: String,
+  statusUpdates: [projectStatusUpdateSchema],
   
   // Timestamps
   createdAt: {

@@ -69,6 +69,29 @@ export const mapProject = (project: any): Project => {
     timestamp: safeDate(item.timestamp),
     verified: true,
   }));
+  const statusUpdates = (project.statusUpdates || []).map((item: any, index: number) => ({
+    id: item.id || item._id || `${project._id || project.id}-status-update-${index}`,
+    updatedById: item.updatedById,
+    updatedByName: item.updatedByName || 'System User',
+    updatedByRole: item.updatedByRole || 'system',
+    previousStatus: item.previousStatus,
+    status: item.status || project.status || 'sanctioned',
+    progress: typeof item.progress === 'number' ? item.progress : undefined,
+    expenses: typeof item.expenses === 'number' ? item.expenses : undefined,
+    resourceUsage: item.resourceUsage,
+    contractorNote: item.contractorNote,
+    proofUrl: resolveUploadUrl(item.proofUrl),
+    createdAt: safeDate(item.createdAt || item.timestamp),
+    aiDescription: item.aiDescription ? {
+      summary: item.aiDescription.summary,
+      officialDescription: item.aiDescription.officialDescription,
+      observations: Array.isArray(item.aiDescription.observations) ? item.aiDescription.observations : [],
+      status: item.aiDescription.status,
+      analyzedAt: item.aiDescription.analyzedAt ? safeDate(item.aiDescription.analyzedAt) : undefined,
+      model: item.aiDescription.model,
+      error: item.aiDescription.error,
+    } : undefined,
+  }));
 
   return {
     id: project._id || project.id,
@@ -95,7 +118,8 @@ export const mapProject = (project: any): Project => {
     performanceScore: project.performanceScore || 100,
     resourceUsage: project.resourceUsage,
     expenses: project.spent || 0,
-    proofUrl: project.proofUrl,
+    proofUrl: resolveUploadUrl(project.proofUrl),
+    statusUpdates,
   };
 };
 
